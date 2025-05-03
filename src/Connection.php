@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Turso\Doctrine\DBAL;
 
+use Doctrine\DBAL\Driver\ServerInfoAwareConnection;
 use Doctrine\DBAL\Driver\Connection as ConnectionInterface;
 use LibSQL;
 use LibSQLTransaction;
+use Doctrine\DBAL\ParameterType;
 
-final class Connection implements ConnectionInterface
+final class Connection implements  ServerInfoAwareConnection
 {
     private bool $isTransaction = false;
     private LibSQLTransaction $transaction;
@@ -19,6 +21,27 @@ final class Connection implements ConnectionInterface
     ) {
     }
 
+    /**
+     * @param $value
+     * @return string
+     */
+    public static function escapeString($value): string
+    {
+        // DISCUSSION: Open PR if you have best approach
+        $escaped_value = str_replace(
+            ["\\", "\x00", "\n", "\r", "\x1a", "'", '"'],
+            ["\\\\", "\\0", "\\n", "\\r", "\\Z", "\\'", '\\"'],
+            $value
+        );
+
+        return $escaped_value;
+    }
+
+    /**
+     * @param string $sql
+     * @return Statement
+     * @throws Exception
+     */
     public function prepare(string $sql): Statement
     {
         try {
@@ -32,23 +55,11 @@ final class Connection implements ConnectionInterface
         return new Statement($this->connection, $statement, $sql, $this->isStandAlone);
     }
 
-    public static function escapeString($value)
-    {
-        // DISCUSSION: Open PR if you have best approach
-        $escaped_value = str_replace(
-            ["\\", "\x00", "\n", "\r", "\x1a", "'", '"'],
-            ["\\\\", "\\0", "\\n", "\\r", "\\Z", "\\'", '\\"'],
-            $value
-        );
-
-        return $escaped_value;
-    }
-
-    public function quote(string $value): string
-    {
-        return self::escapeString($value);
-    }
-
+    /**
+     * @param $sql
+     * @return Result
+     * @throws Exception
+     */
     public function query(string $sql): Result
     {
         try {
@@ -69,6 +80,21 @@ final class Connection implements ConnectionInterface
         return new Result($result, $this->isStandAlone);
     }
 
+    /**
+     * @param string $value
+     * @param int $type
+     * @return mixed
+     */
+    public function quote($value, $type = ParameterType::STRING): string
+    {
+        return self::escapeString($value);
+    }
+
+    /**
+     * @param string $sql
+     * @return int
+     * @throws Exception
+     */
     public function exec(string $sql): int
     {
         $changes = 0;
@@ -83,13 +109,20 @@ final class Connection implements ConnectionInterface
         return $changes;
     }
 
-    public function lastInsertId(): int
+    /**
+     * @param string|null $name
+     * @return int
+     */
+    public function lastInsertId($name = null): int
     {
         // echo "Last insert ID, in transaction (". ($this->isTransaction ? 'YES' : 'NO') .")\n";
         return $this->isTransaction ? $this->transaction->changes() : $this->connection->changes();
     }
 
-    public function beginTransaction(): void
+    /**
+     * @inheritDoc
+     */
+    public function beginTransaction(): bool
     {
         try {
             $this->isTransaction = true;
@@ -98,32 +131,37 @@ final class Connection implements ConnectionInterface
         } catch (\Exception $e) {
             throw Exception::new($e);
         }
+        return is_object($this->transaction);
     }
 
-    public function commit(): void
+    public function commit(): bool
     {
         try {
             if ($this->isTransaction) {
                 $this->transaction->commit();
                 $this->isTransaction = false;
+                return true;
             }
             // echo "Committed\n";
         } catch (\Exception $e) {
             throw Exception::new($e);
         }
+        return false;
     }
 
-    public function rollBack(): void
+    public function rollBack(): bool
     {
         try {
             if ($this->isTransaction) {
                 $this->transaction->rollBack();
                 $this->isTransaction = false;
+                return true;
             }
             // echo "Rollback\n";
         } catch (\Exception $e) {
             throw Exception::new($e);
         }
+        return false;
     }
 
     public function getNativeConnection(): LibSQL

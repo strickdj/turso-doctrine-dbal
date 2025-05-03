@@ -1,11 +1,11 @@
 {
-    "name": "tursodatabase/turso-doctrine-dbal",
+    "name": "strickdj/turso-doctrine-dbal",
     "description": "A Doctribe DBAL Driver implementation on top of LibSQL Extension",
     "type": "library",
     "version": "1.2.1",
     "require": {
         "php": ">=8.1",
-        "doctrine/dbal": "^4.0"
+        "doctrine/dbal": "^3.0"
     },
     "license": "MIT",
     "autoload": {

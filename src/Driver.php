@@ -8,7 +8,7 @@ use Doctrine\DBAL\Driver\AbstractSQLiteDriver;
 use LibSQL;
 use SensitiveParameter;
 
-final class Driver extends AbstractSQLiteDriver
+final class Driver extends AbstractSQLiteDriver implements \Doctrine\DBAL\Driver
 {
     private LibSQL $connection;
     protected bool $isStandAlone = true;
@@ -17,7 +17,6 @@ final class Driver extends AbstractSQLiteDriver
         #[SensitiveParameter]
         array $params,
     ): Connection {
-
         if (
             isset($params['driverOptions']['use_framework']) &&
             isset($params['driverOptions']['url']) &&
@@ -111,7 +110,7 @@ final class Driver extends AbstractSQLiteDriver
             !empty($params['sync_url'])
         ) {
             return "remote";
-        } else if ($this->in_strpos($params['url'], ['.db', '.sqlite']) !== false) {
+        } else if ($this->in_strpos(($params['url'] ?? ''), ['.db', '.sqlite']) !== false) {
             return "local";
         } else {
             return "memory";
